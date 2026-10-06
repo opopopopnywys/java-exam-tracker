@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>调试探针 · Java二级备考助手</title>
+    <style>
+        body { font-family: ui-monospace, "Courier New", Consolas, monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; margin: 0; }
+        .debug-container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #4ec9b0; margin-top: 0; }
+        h2 { color: #569cd6; margin-top: 30px; border-bottom: 1px solid #444; padding-bottom: 6px; font-size: 18px; }
+        .panel { background: #252526; border: 1px solid #444; border-radius: 8px; padding: 16px; margin: 12px 0; }
+        .ok { color: #4ec9b0; }
+        .warn { color: #dcdcaa; }
+        .err { color: #f48771; }
+        pre { background: #0e0e0e; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; margin: 0; }
+        .key { color: #9cdcfe; }
+        .val { color: #ce9178; word-break: break-all; }
+        .btn { display: inline-block; padding: 8px 16px; background: #0e639c; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 8px; font-family: inherit; font-size: 13px; }
+        .btn:hover { background: #1177bb; }
+        .btn-danger { background: #a1260d; }
+        .btn-danger:hover { background: #c42b1c; }
+        .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .summary-card { background: #2d2d30; padding: 14px; border-radius: 6px; text-align: center; }
+        .summary-num { font-size: 28px; color: #4ec9b0; font-weight: bold; }
+        .summary-label { font-size: 12px; color: #999; margin-top: 4px; }
+        .sub-h { color: #dcdcaa; margin: 12px 0 6px 0; font-size: 14px; }
+        a { color: #4ec9b0; }
+    </style>
+</head>
+<body>
+<div class="debug-container">
+    <h1>🔧 Java二级备考 · 调试探针</h1>
+    <p style="color:#999;">这个页面是<strong style="color:#4ec9b0;">自包含</strong>的，不依赖外部 JS，<strong>双击即可打开</strong>（file://）。<br>
+    ⚠️ 但 localStorage 按 origin 隔离，要查 <code>http://localhost:8090/index.html</code> 的数据，请用 <code>http://localhost:8090/debug.html</code> 打开本页。</p>
+
+    <div style="margin: 16px 0;">
+        <button class="btn" onclick="render()">🔄 刷新数据</button>
+        <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空 localStorage</button>
+        <button class="btn" onclick="addTestRecord()">➕ 插入今日「第3章」测试</button>
+        <button class="btn" onclick="addYesterdayRecord()">➕ 插入「昨天第1章」测试</button>
+        <button class="btn" onclick="copyJSON()">📋 复制JSON</button>
+    </div>
+
+    <!-- 汇总统计 -->
+    <h2>📊 汇总</h2>
+    <div class="summary-cards">
+        <div class="summary-card">
+            <div class="summary-num" id="sum-study">-</div>
+            <div class="summary-label">学习记录数</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-num" id="sum-chapter">-</div>
+            <div class="summary-label">已学章节</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-num" id="sum-review-pending">-</div>
+            <div class="summary-label">待复习项</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-num" id="sum-today-review">-</div>
+            <div class="summary-label">今日待复习</div>
+        </div>
+    </div>
+
+    <!-- localStorage 原始数据 -->
+    <h2>💾 localStorage 原始数据</h2>
+    <div class="panel">
+        <div style="margin-bottom:6px;"><span class="key">java_review_study_records</span>: <span id="raw-study" class="val"></span></div>
+        <div style="margin-bottom:6px;"><span class="key">java_review_mistake_records</span>: <span id="raw-mistake" class="val"></span></div>
+        <div><span class="key">java_review_settings</span>: <span id="raw-settings" class="val"></span></div>
+    </div>
+
+    <!-- 学习记录解析 -->
+    <h2>📚 学习记录解析</h2>
+    <div class="panel"><pre id="study-pretty"></pre></div>
+
+    <!-- ReviewModule 衍生数据 -->
+    <h2>🔁 复习日历衍生数据</h2>
+    <div class="panel">
+        <div class="sub-h">今日待复习（getTodayReviews 输出）</div>
+        <pre id="today-reviews"></pre>
+        <div class="sub-h">未来15天日历（getCalendar 输出）</div>
+        <pre id="calendar"></pre>
+        <div class="sub-h">章节掌握度（getChapterMastery 输出）</div>
+        <pre id="mastery"></pre>
+    </div>
+
+    <!-- 当前时间 -->
+    <h2>⏰ 当前时间</h2>
+    <div class="panel"><pre id="now-time"></pre></div>
+</div>
+
+<script>
+/* v20260824-2 兼容旧数据版 */
+
+const STUDY_KEY = 'java_review_study_records';
+const MISTAKE_KEY = 'java_review_mistake_records';
+
+function getStudyRecords() {
+    try { return JSON.parse(localStorage.getItem(STUDY_KEY) || '[]'); }
+    catch (e) { return []; }
+}
+function saveStudyRecords(records) {
+    localStorage.setItem(STUDY_KEY, JSON.stringify(records));
+}
+function addStudyRecord(record) {
+    const records = getStudyRecords();
+    records.push(record);
+    saveStudyRecords(records);
+}
+function getMistakeRecords() {
+    try { return JSON.parse(localStorage.getItem(MISTAKE_KEY) || '[]'); }
+    catch (e) { return []; }
+}
+function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+}
+
+const REVIEW_INTERVALS = [1, 2, 4, 7, 15];
+const CHAPTER_NAMES = {
+    'ch1': '第1章 基本数据类型', 'ch2': '第2章 运算符和表达式',
+    'ch3': '第3章 流程控制', 'ch4': '第4章 类与对象',
+    'ch5': '第5章 继承与多态', 'ch6': '第6章 异常处理',
+    'ch7': '第7章 线程', 'ch8': '第8章 GUI界面',
+    'ch9': '第9章 Applet', 'ch10': '第10章 集合与IO',
+    'pb1': '公共基础·计算机基础', 'pb2': '公共基础·数据结构与算法',
+    'pb3': '公共基础·程序设计基础', 'pb4': '公共基础·软件工程基础',
+    'pb5': '公共基础·数据库设计基础',
+};
+
+function dateStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+function parseDate(s) {
+    if (!s || typeof s !== 'string') return new Date(NaN);
+    const parts = s.split('-');
+    if (parts.length !== 3) return new Date(NaN);
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+}
+function isValidDateStr(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+function addDays(dateStr, days) {
+    const d = parseDate(dateStr);
+    d.setDate(d.getDate() + days);
+    return dateStr(d);
+}
+function daysDiff(d1, d2) {
+    return Math.round((parseDate(d2) - parseDate(d1)) / (1000 * 60 * 60 * 24));
+}
+
+function buildStudyRecord(date, chapter, mastery) {
+    const id = genId();
+    return {
+        id, date, chapter,
+        chapterName: CHAPTER_NAMES[chapter] || chapter,
+        mastery,
+        reviewDates: REVIEW_INTERVALS.map(interval => ({ date: addDays(date, interval), done: false })),
+        createdAt: Date.now(),
+    };
+}
+
+function safeReviewDates(record) {
+    return record && Array.isArray(record.reviewDates) ? record.reviewDates : [];
+}
+function chapterNameOf(record) {
+    if (!record) return '未知章节';
+    return record.chapterName || CHAPTER_NAMES[record.chapter] || record.chapter || '未知章节';
+}
+
+function getTodayReviews(todayStr) {
+    const records = getStudyRecords();
+    const result = [];
+    records.forEach(record => {
+        safeReviewDates(record).forEach(rd => {
+            if (!rd || !isValidDateStr(rd.date)) return;
+            const diff = daysDiff(todayStr, rd.date);
+            if (diff <= 0 && !rd.done) {
+                result.push({ recordId: record.id, chapter: record.chapter, chapterName: chapterNameOf(record), reviewDate: rd.date, diff });
+            }
+        });
+    });
+    result.sort((a, b) => a.diff - b.diff);
+    return result;
+}
+
+function getCalendar(todayStr, daysAhead) {
+    daysAhead = daysAhead || 15;
+    const records = getStudyRecords();
+    const calendar = [];
+    for (let i = 0; i < daysAhead; i++) {
+        const d = addDays(todayStr, i);
+        const items = [];
+        records.forEach(record => {
+            safeReviewDates(record).forEach(rd => {
+                if (rd && rd.date === d) {
+                    items.push({ type: 'review', chapterName: chapterNameOf(record), done: rd.done });
+                }
+            });
+        });
+        if (d === todayStr) {
+            records.forEach(record => {
+                if (record && record.date === d) {
+                    items.push({ type: 'study', chapterName: chapterNameOf(record), done: false });
+                }
+            });
+        }
+        calendar.push({ date: d, items });
+    }
+    return calendar;
+}
+
+function getChapterMastery() {
+    const records = getStudyRecords();
+    const map = {};
+    Object.keys(CHAPTER_NAMES).forEach(key => {
+        map[key] = { id: key, name: CHAPTER_NAMES[key], level: 'gray', count: 0 };
+    });
+    const latestByChapter = {};
+    records.forEach(r => {
+        if (!r || !r.chapter) return;
+        if (!latestByChapter[r.chapter] || (r.createdAt || 0) > (latestByChapter[r.chapter].createdAt || 0)) {
+            latestByChapter[r.chapter] = r;
+        }
+        if (map[r.chapter]) map[r.chapter].count++;
+    });
+    Object.keys(latestByChapter).forEach(ch => {
+        if (map[ch]) map[ch].level = latestByChapter[ch].mastery || 'gray';
+    });
+    return Object.values(map);
+}
+
+function clearAll() {
+    if (!confirm('确认清空 localStorage 所有数据？')) return;
+    localStorage.removeItem(STUDY_KEY);
+    localStorage.removeItem(MISTAKE_KEY);
+    localStorage.removeItem('java_review_settings');
+    alert('已清空');
+    render();
+}
+
+function copyJSON() {
+    const data = { study_records: getStudyRecords(), mistake_records: getMistakeRecords() };
+    const json = JSON.stringify(data, null, 2);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json);
+        alert('已复制到剪贴板');
+    } else {
+        prompt('手动复制（按Ctrl+C）：', json);
+    }
+}
+
+function addTestRecord() {
+    if (!confirm('插入一条今日「第3章 流程控制」+Day+1的记录？')) return;
+    addStudyRecord(buildStudyRecord(dateStr(new Date()), 'ch3', 'blue'));
+    alert('已插入（章节=第3章·掌握度=蓝色）');
+    render();
+}
+
+function addYesterdayRecord() {
+    if (!confirm('插入一条「昨天第1章」记录？明天打开就能在「今日待复习」里看到')) return;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    addStudyRecord(buildStudyRecord(dateStr(yesterday), 'ch1', 'gray'));
+    alert('已插入（昨天=' + dateStr(yesterday) + '）');
+    render();
+}
+
+function render() {
+    const studyRaw = localStorage.getItem(STUDY_KEY);
+    const mistakeRaw = localStorage.getItem(MISTAKE_KEY);
+    const settingsRaw = localStorage.getItem('java_review_settings');
+
+    document.getElementById('raw-study').textContent =
+        studyRaw ? (studyRaw.length > 250 ? studyRaw.substring(0, 250) + '...(' + studyRaw.length + ' chars)' : studyRaw) : '(空)';
+    document.getElementById('raw-mistake').textContent =
+        mistakeRaw ? (mistakeRaw.length > 250 ? mistakeRaw.substring(0, 250) + '...(' + mistakeRaw.length + ' chars)' : mistakeRaw) : '(空)';
+    document.getElementById('raw-settings').textContent = settingsRaw || '(空)';
+
+    if (!studyRaw) {
+        document.getElementById('study-pretty').innerHTML =
+            '<span class="err">⚠️ localStorage 里没有学习记录！</span>\n\n' +
+            '可能原因：\n' +
+            '1. 你从未点过「添加记录」按钮\n' +
+            '2. 主应用未在本浏览器/本端口运行过（localStorage 按 origin 隔离）\n' +
+            '3. 浏览器禁用了 localStorage（隐私模式）\n' +
+            '4. localStorage 容量已满（约5MB）\n';
+    } else {
+        const records = getStudyRecords();
+        document.getElementById('study-pretty').textContent =
+            '记录数：' + records.length + '\n\n' +
+            records.map((r, i) => {
+                return [
+                    `【记录${i+1}】 id=${r.id || '无id'}`,
+                    `  日期: ${r.date || '无日期'}`,
+                    `  章节: ${chapterNameOf(r)}`,
+                    `  掌握度: ${r.mastery || '无'}`,
+                    `  复习排程:`,
+                    ...safeReviewDates(r).map(rd => `    ${rd.date || '?'} [${rd.done ? '✓ 已复习' : '○ 未复习'}]`),
+                    ''
+                ].join('\n');
+            }).join('\n');
+    }
+
+    const records = getStudyRecords();
+    const chapters = new Set(records.filter(r => r && r.chapter).map(r => r.chapter));
+    const allReviews = records.flatMap(r => safeReviewDates(r));
+    const pendingReviews = allReviews.filter(rd => rd && !rd.done).length;
+    const today = dateStr(new Date());
+    const todayReviews = getTodayReviews(today);
+
+    document.getElementById('sum-study').textContent = records.length;
+    document.getElementById('sum-chapter').textContent = chapters.size;
+    document.getElementById('sum-review-pending').textContent = pendingReviews;
+    document.getElementById('sum-today-review').textContent = todayReviews.length;
+
+    document.getElementById('today-reviews').textContent =
+        todayReviews.length === 0
+            ? '(空 - 艾宾浩斯设计：今天学的最早要明天复习)' + (records.length > 0 ? '\n  (你有 '+records.length+' 条记录，但 Day+1 还没到)' : '')
+            : todayReviews.map(r => `  ${r.chapterName} → 应在 ${r.reviewDate} 复习 (diff=${r.diff}天)`).join('\n');
+
+    const calendar = getCalendar(today, 15);
+    document.getElementById('calendar').textContent = calendar.map(day => {
+        const marker = day.date === today ? ' ← 今天' : '';
+        const items = day.items.length === 0 ? '  无' :
+            day.items.map(it => `  [${it.type === 'study' ? '📖今学' : '🔁复习'}${it.done ? '✓' : ''}] ${it.chapterName}`).join('\n');
+        return `${day.date}${marker}\n${items}`;
+    }).join('\n\n');
+
+    const mastery = getChapterMastery();
+    const learned = mastery.filter(m => m.count > 0);
+    const unlearned = mastery.filter(m => m.count === 0);
+    document.getElementById('mastery').textContent =
+        (learned.length > 0
+            ? learned.map(m => `  ${m.name} → 掌握度:${m.level} (共${m.count}次记录)`).join('\n')
+            : '  (尚未学习任何章节)') +
+        (unlearned.length > 0
+            ? '\n\n（还有 ' + unlearned.length + ' 个章节未学习，主页显示为灰色占位）'
+            : '\n\n（所有 14 个章节都已学习）');
+
+    document.getElementById('now-time').textContent =
+        '系统时间: ' + new Date().toLocaleString('zh-CN') + '\n' +
+        '今天: ' + today + '\n' +
+        'location.protocol: ' + location.protocol + '\n' +
+        'location.host: ' + location.host;
+}
+
+render();
+</script>
+</body>
+</html>

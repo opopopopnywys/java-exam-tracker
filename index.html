@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Java二级备考 · 错题本+复习追踪</title>
+    <link rel="stylesheet" href="css/style.css?v=20260824">
+</head>
+<body>
+    <!-- 实时数据状态条：永远显示，告诉你 localStorage 里到底有没有数据 -->
+    <div id="status-bar" style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white; padding: 10px 20px; font-size: 13px;
+        display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+        font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+    ">
+        <span style="font-weight:600;">📊 实时数据状态</span>
+        <span id="status-records">加载中...</span>
+        <span id="status-reviews"></span>
+        <span id="status-mistakes"></span>
+        <button id="btn-clear-all" style="
+            margin-left:auto; padding:4px 12px; border:none; border-radius:4px;
+            background:rgba(255,255,255,0.2); color:white; cursor:pointer; font-size:12px;
+        ">🗑 清空所有数据</button>
+    </div>
+
+    <!-- 顶部Tab栏 -->
+    <header class="app-header">
+        <h1>📚 Java二级备考助手</h1>
+        <nav class="tab-bar">
+            <button class="tab-btn active" data-tab="review">📅 复习日历</button>
+            <button class="tab-btn" data-tab="mistakes">📝 错题本</button>
+        </nav>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="app-main">
+
+        <!-- ========== Tab1: 复习日历 ========== -->
+        <section id="tab-review" class="tab-panel active">
+            <div class="panel-header">
+                <h2>复习日历</h2>
+                <p class="subtitle">10天冲刺版 · 重做节点 D+2、D+4 + 9/16-17 统一第三遍</p>
+            </div>
+
+            <!-- 添加学习记录 -->
+            <div class="card">
+                <h3>➕ 记录今天学了什么</h3>
+                <div class="form-row">
+                    <label>日期：<input type="date" id="study-date"></label>
+                    <label>章节：
+                        <select id="study-chapter">
+                            <option value="">-- 选择章节 --</option>
+                            <option value="ch1">第1章 基本数据类型</option>
+                            <option value="ch2">第2章 运算符和表达式</option>
+                            <option value="ch3">第3章 流程控制</option>
+                            <option value="ch4">第4章 类与对象</option>
+                            <option value="ch5">第5章 继承与多态</option>
+                            <option value="ch6">第6章 异常处理</option>
+                            <option value="ch7">第7章 线程</option>
+                            <option value="ch8">第8章 GUI界面</option>
+                            <option value="ch9">第9章 Applet</option>
+                            <option value="ch10">第10章 集合与IO</option>
+                            <option value="pb1">公共基础·计算机基础</option>
+                            <option value="pb2">公共基础·数据结构与算法</option>
+                            <option value="pb3">公共基础·程序设计基础</option>
+                            <option value="pb4">公共基础·软件工程基础</option>
+                            <option value="pb5">公共基础·数据库设计基础</option>
+                        </select>
+                    </label>
+                    <label>掌握度：
+                        <select id="study-mastery">
+                            <option value="gray">⚪ 刚学，很模糊</option>
+                            <option value="blue">🔵 有点印象</option>
+                            <option value="green">🟢 基本掌握</option>
+                            <option value="yellow">🟡 比较熟练</option>
+                            <option value="red">🔴 已经滚瓜烂熟</option>
+                        </select>
+                    </label>
+                    <button id="btn-add-study" class="btn-primary">添加记录</button>
+                </div>
+                <!-- 添加成功后的即时反馈（替代alert弹窗） -->
+                <div id="study-feedback" class="study-feedback" style="display:none;"></div>
+            </div>
+
+            <!-- 今日待复习 -->
+            <div class="card">
+                <h3>🔔 今天该复习什么（<span id="today-date"></span>）</h3>
+                <div id="today-review-list" class="review-list">
+                    <!-- JS动态渲染 -->
+                </div>
+            </div>
+
+            <!-- 复习日历表格 -->
+            <div class="card">
+                <h3>📅 未来15天复习计划</h3>
+                <div id="review-calendar" class="calendar-grid">
+                    <!-- JS动态渲染 -->
+                </div>
+            </div>
+
+            <!-- 章节掌握度总览 -->
+            <div class="card">
+                <h3>📊 章节掌握度</h3>
+                <div id="chapter-mastery" class="mastery-grid">
+                    <!-- JS动态渲染 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Tab2: 错题本 ========== -->
+        <section id="tab-mistakes" class="tab-panel">
+            <div class="panel-header">
+                <h2>错题本</h2>
+                <p class="subtitle">截图归档 + 错因分类 + 重做追踪</p>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-total">0</div>
+                    <div class="stat-label">错题总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-not-redone">0</div>
+                    <div class="stat-label">未重做</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-redone-correct">0</div>
+                    <div class="stat-label">已重做✓</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-redone-wrong">0</div>
+                    <div class="stat-label">已重做✗</div>
+                </div>
+            </div>
+
+            <!-- 添加错题 -->
+            <div class="card">
+                <h3>➕ 添加错题</h3>
+                <div class="form-row">
+                    <label>章节：
+                        <select id="mistake-chapter">
+                            <option value="">-- 选择章节 --</option>
+                            <option value="ch1">第1章 基本数据类型</option>
+                            <option value="ch2">第2章 运算符和表达式</option>
+                            <option value="ch3">第3章 流程控制</option>
+                            <option value="ch4">第4章 类与对象</option>
+                            <option value="ch5">第5章 继承与多态</option>
+                            <option value="ch6">第6章 异常处理</option>
+                            <option value="ch7">第7章 线程</option>
+                            <option value="ch8">第8章 GUI界面</option>
+                            <option value="ch9">第9章 Applet</option>
+                            <option value="ch10">第10章 集合与IO</option>
+                            <option value="pb1">公共基础·计算机基础</option>
+                            <option value="pb2">公共基础·数据结构与算法</option>
+                            <option value="pb3">公共基础·程序设计基础</option>
+                            <option value="pb4">公共基础·软件工程基础</option>
+                            <option value="pb5">公共基础·数据库设计基础</option>
+                        </select>
+                    </label>
+                    <label>错因：
+                        <select id="mistake-reason">
+                            <option value="blindspot">概念盲区</option>
+                            <option value="syntax">语法细节</option>
+                            <option value="misread">审题错误</option>
+                            <option value="env">环境操作</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <label>考点口诀：<input type="text" id="mistake-trick" placeholder="一句话记住这个考点"></label>
+                    <label>笔记：<input type="text" id="mistake-note" placeholder="额外备注（可选）"></label>
+                </div>
+
+                <div class="screenshot-zone" id="screenshot-zone">
+                    <div class="screenshot-placeholder" id="screenshot-placeholder">
+                        <div class="zone-icon">📋</div>
+                        <span>粘贴截图 (Ctrl+V) / 拖拽图片 / 点击选择</span>
+                    </div>
+                    <img class="screenshot-preview" id="screenshot-preview" style="display:none;">
+                    <button type="button" class="btn-small btn-clear-screenshot" id="btn-clear-screenshot" style="display:none;">✕ 清除截图</button>
+                </div>
+                <input type="file" id="mistake-screenshot" accept="image/*" style="display:none;">
+
+                <button id="btn-add-mistake" class="btn-primary">保存到错题本</button>
+            </div>
+
+            <!-- 筛选器 -->
+            <div class="card">
+                <h3>🔍 筛选</h3>
+                <div class="form-row">
+                    <label>按章节：
+                        <select id="filter-chapter">
+                            <option value="">全部章节</option>
+                            <option value="ch1">第1章</option>
+                            <option value="ch2">第2章</option>
+                            <option value="ch3">第3章</option>
+                            <option value="ch4">第4章</option>
+                            <option value="ch5">第5章</option>
+                            <option value="ch6">第6章</option>
+                            <option value="ch7">第7章</option>
+                            <option value="ch8">第8章</option>
+                            <option value="ch9">第9章</option>
+                            <option value="ch10">第10章</option>
+                            <option value="pb">公共基础</option>
+                        </select>
+                    </label>
+                    <label>按错因：
+                        <select id="filter-reason">
+                            <option value="">全部错因</option>
+                            <option value="blindspot">概念盲区</option>
+                            <option value="syntax">语法细节</option>
+                            <option value="misread">审题错误</option>
+                            <option value="env">环境操作</option>
+                        </select>
+                    </label>
+                    <label>按状态：
+                        <select id="filter-status">
+                            <option value="">全部状态</option>
+                            <option value="pending">未重做</option>
+                            <option value="correct">已重做✓</option>
+                            <option value="wrong">已重做✗</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 错题列表 -->
+            <div id="mistake-list" class="mistake-list">
+                <!-- JS动态渲染 -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 版本标识：刷新页面后会更新到此版本号 -->
+    <footer style="text-align:center; padding:20px; color:#999; font-size:11px; border-top:1px solid #eee; margin-top:30px;">
+        <span id="app-version">v20261002-1</span> · Java二级备考助手 ·
+        <span style="color:#c33;">修复「清空所有数据」未真正删除的问题</span>
+    </footer>
+
+    <!-- JS脚本：动态加载 + 时间戳，彻底破坏浏览器缓存 -->
+    <script>
+        (function loadScripts() {
+            const t = Date.now();
+            const scripts = ['js/storage.js', 'js/review.js', 'js/mistakes.js', 'js/app.js'];
+            scripts.forEach(function(src) {
+                var s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false; // 保证按顺序执行
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
+</body>
+</html>
